@@ -1,24 +1,30 @@
+x-base: &base
+  image: fastapi-celery:latest
+  volumes:
+    - ./app:/app
+
 services:
+  base_builder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    <<: *base
+
   fastapi:
-    build: .
+    <<: *base
     container_name: fastapi
     command: >
       sh -c "uv sync && . .venv/bin/activate && uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
-    volumes:
-      - ./app:/app
     ports:
       - "8000:8000"
     depends_on:
       - redis
 
   celery:
-    build: .
+    <<: *base
     container_name: celery
     command: > 
       sh -c "uv sync && . .venv/bin/activate && celery -A package.workers.controller worker --loglevel=info"
-    # command: sh -c ". .venv/bin/activate && celery -A app.worker worker --loglevel=info"
-    volumes:
-      - ./app:/app
     depends_on:
       - redis
 
@@ -29,18 +35,15 @@ services:
       - "6379:6379"
 
   flower:
-    build: .
+    <<: *base
     container_name: flower
     command: >
       sh -c "uv sync && . .venv/bin/activate && celery -A package.workers.controller flower --port=5555"
-    # command: sh -c ". .venv/bin/activate && celery -A app.worker flower --port=5555"
     ports:
       - "5556:5555"
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
-    volumes:
-      - ./app:/app
     depends_on:
       - fastapi
       - celery
