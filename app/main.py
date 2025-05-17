@@ -1,5 +1,6 @@
-from fastapi import FastAPI
-from .worker import celery_app, add
+from fastapi import FastAPI, HTTPException
+from package.workers.worker import add
+from package.workers.controller import celery_app
 from celery import group
 from celery.result import AsyncResult, GroupResult
 import random
@@ -24,12 +25,22 @@ def read_add():
 @app.get("/task/status/{task_id}")
 def get_task_status(task_id: str):
     result = AsyncResult(task_id, app=celery_app)
-    return {"task_status": result.status}
+    return {"task_id": task_id, "status": result.status}
 
 @app.get("/task/result/{task_id}")
 def get_task_result(task_id: str):
     result = AsyncResult(task_id, app=celery_app)
-    return {"task_result": result.result}
+
+    if not result.ready():
+        return {"status": "pending"}
+
+    if result.failed():
+        raise HTTPException(status_code=500, detail="Task failed")
+
+    return {
+        "status": "completed",
+        "result": result.result
+    }
 
 @app.get("/group/add")
 def read_group_add():
@@ -46,7 +57,13 @@ def get_group_status(task_id: str):
 @app.get("/group/result/{task_id}")
 def get_group_result(task_id: str):
     result = GroupResult.restore(task_id, app=celery_app)
-    result.successful()
-    return {
-        "group_result": result.get()
-    }
+    if result is None:
+        raise HTTPException(status_code=404, detail="GroupResult not found or expired.")
+
+    if not result.ready():
+        return {"status": "pending"}
+
+    try:
+        return {"status": "completed", "result": result.get(timeout=10)}
+    except TimeoutError:
+        raise HTTPException(status_code=504, detail="GroupResult timeout")

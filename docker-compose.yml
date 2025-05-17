@@ -2,9 +2,10 @@ services:
   fastapi:
     build: .
     container_name: fastapi
-    command: sh -c ". .venv/bin/activate && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    command: >
+      sh -c "uv sync && . .venv/bin/activate && uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
     volumes:
-      - ./app:/src/app
+      - ./app:/app
     ports:
       - "8000:8000"
     depends_on:
@@ -13,9 +14,11 @@ services:
   celery:
     build: .
     container_name: celery
-    command: sh -c ". .venv/bin/activate && celery -A app.worker worker --loglevel=info"
+    command: > 
+      sh -c "uv sync && . .venv/bin/activate && celery -A package.workers.controller worker --loglevel=info"
+    # command: sh -c ". .venv/bin/activate && celery -A app.worker worker --loglevel=info"
     volumes:
-      - ./app:/src/app
+      - ./app:/app
     depends_on:
       - redis
 
@@ -28,14 +31,16 @@ services:
   flower:
     build: .
     container_name: flower
-    command: sh -c ". .venv/bin/activate && celery -A app.worker flower --port=5555"
+    command: >
+      sh -c "uv sync && . .venv/bin/activate && celery -A package.workers.controller flower --port=5555"
+    # command: sh -c ". .venv/bin/activate && celery -A app.worker flower --port=5555"
     ports:
       - "5556:5555"
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
     volumes:
-      - ./app:/src/app
+      - ./app:/app
     depends_on:
       - fastapi
       - celery
