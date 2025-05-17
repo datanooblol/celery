@@ -1,0 +1,13 @@
+[project]
+name = "fastapi-celery-redis"
+version = "0.1.0"
+description = "a practice project"
+readme = "README.md"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "celery[redis]",
+    "flower",
+    "ipykernel",
+    "requests"
+]
